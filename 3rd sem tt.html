@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DTU Premium Timetable Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Required Libraries for Exporting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f3f4f6;
+            --surface-color: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #4b5563;
+            --border-color: #e5e7eb;
+            --accent-color: #1e3a8a;
+            --hover-color: #f9fafb;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            
+            --color-dsd: #86efac; --color-dsd-text: #166534; --color-dsd-dot: #4ade80;
+            --color-ds: #bae6fd; --color-ds-text: #075985; --color-ds-dot: #3b82f6;
+            --color-oop: #fed7aa; --color-oop-text: #9a3412; --color-oop-dot: #f59e0b;
+            --color-os: #e9d5ff; --color-os-text: #6b21a8; --color-os-dot: #a855f7;
+            --color-sem: #fecdd3; --color-sem-text: #9f1239; --color-sem-dot: #f43f5e;
+            --color-free: #f3f4f6; --color-free-text: #9ca3af;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0f172a;
+            --surface-color: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --accent-color: #3b82f6;
+            --hover-color: #334155;
+            --glass-bg: rgba(30, 41, 59, 0.85);
+            --glass-border: rgba(51, 65, 85, 0.5);
+            
+            --color-dsd: rgba(74, 222, 128, 0.15); --color-dsd-text: #86efac;
+            --color-ds: rgba(59, 130, 246, 0.15); --color-ds-text: #93c5fd;
+            --color-oop: rgba(245, 158, 11, 0.15); --color-oop-text: #fcd34d;
+            --color-os: rgba(168, 85, 247, 0.15); --color-os-text: #d8b4fe;
+            --color-sem: rgba(244, 63, 94, 0.15); --color-sem-text: #fda4af;
+            --color-free: rgba(71, 85, 105, 0.2); --color-free-text: #64748b;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; transition: background-color 0.3s, color 0.3s; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.5;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+
+        .header {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .univ-title h1 { font-size: 1.25rem; font-weight: 800; color: var(--accent-color); }
+        .univ-title h2 { font-size: 0.9rem; color: var(--text-secondary); font-weight: 500; }
+
+        .meta-info { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; font-weight: 500;}
+        .meta-item { display: flex; align-items: center; gap: 0.4rem; background: var(--surface-color); padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--border-color); }
+
+        .controls { display: flex; gap: 0.75rem; align-items: center; }
+        button, .search-bar input {
+            padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--surface-color); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; cursor: pointer; outline: none;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        button:hover { background: var(--hover-color); }
+        
+        .btn-export { background: #1e293b; color: white; border: none; }
+        .btn-export:hover { background: #334155; }
+        [data-theme="dark"] .btn-export { background: #3b82f6; }
+        [data-theme="dark"] .btn-export:hover { background: #2563eb; }
+
+        .search-bar { display: flex; align-items: center; position: relative; }
+        .search-bar i { position: absolute; left: 0.8rem; color: var(--text-secondary); font-size: 0.85rem; }
+        .search-bar input { padding-left: 2.2rem; width: 200px; }
+
+        .timetable-container {
+            background: var(--surface-color); border-radius: 12px; box-shadow: var(--shadow-sm); overflow-x: auto; border: 1px solid var(--border-color);
+        }
+
+        .timetable {
+            display: grid; grid-template-columns: 70px repeat(10, minmax(105px, 1fr)); gap: 1px; background: var(--border-color); min-width: 1200px;
+        }
+
+        .cell {
+            background: var(--surface-color); padding: 0.6rem; min-height: 90px; display: flex; flex-direction: column; position: relative;
+        }
+
+        .cell-header {
+            font-weight: 700; color: var(--text-secondary); text-align: center; display: flex; align-items: center; justify-content: center; background: var(--surface-color); font-size: 0.8rem; padding: 0.8rem;
+        }
+
+        .day-header { font-weight: 800; justify-content: flex-start; padding-left: 1rem; color: var(--accent-color); }
+        .current-day { background: rgba(59, 130, 246, 0.05) !important; border-left: 4px solid var(--accent-color); }
+        .slot-2-hours { grid-column: span 2; }
+
+        .class-card {
+            border-radius: 6px; padding: 0.6rem; height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem; font-size: 0.75rem; border-left: 3px solid transparent;
+        }
+        .subject { font-weight: 800; }
+        .faculty { font-weight: 500; opacity: 0.8; font-size: 0.7rem; }
+        .room { font-weight: 600; font-size: 0.7rem; margin-top: auto; }
+        
+        .lab-container { display: flex; flex-direction: column; gap: 4px; height: 100%; }
+        .lab-group {
+            display: flex; align-items: center; padding: 0.3rem 0.5rem; border-radius: 4px; font-size: 0.7rem; gap: 0.5rem; flex: 1; border-left: 3px solid transparent;
+        }
+        .group-label { font-weight: 800; min-width: 32px; border-right: 1px solid rgba(128,128,128,0.2); padding-right: 0.4rem; }
+        .status-free { font-style: italic; font-weight: 500; opacity: 0.7; }
+
+        .bg-os { background: var(--color-os); color: var(--color-os-text); border-left-color: var(--color-os-dot); }
+        .bg-sem { background: var(--color-sem); color: var(--color-sem-text); border-left-color: var(--color-sem-dot); }
+        .bg-dsd { background: var(--color-dsd); color: var(--color-dsd-text); border-left-color: var(--color-dsd-dot); }
+        .bg-ds { background: var(--color-ds); color: var(--color-ds-text); border-left-color: var(--color-ds-dot); }
+        .bg-oop { background: var(--color-oop); color: var(--color-oop-text); border-left-color: var(--color-oop-dot); }
+        .bg-free { background: var(--color-free); border: 1px dashed var(--color-free-text); border-left: none; color: var(--color-free-text); }
+
+        .dashboard-panels {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 0.5rem;
+        }
+        
+        @media (max-width: 1024px) { .dashboard-panels { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 640px) { .dashboard-panels { grid-template-columns: 1fr; } }
+
+        .panel {
+            background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column;
+        }
+
+        .panel-header {
+            background: #0f172a; color: #ffffff; font-size: 0.75rem; font-weight: 700; text-align: center; padding: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        .panel-body { padding: 1rem; font-size: 0.8rem; flex: 1; display: flex; flex-direction: column; gap: 0.75rem; }
+
+        .subject-line { display: flex; align-items: center; gap: 0.75rem; font-weight: 600; color: var(--text-secondary); }
+        .dot { width: 12px; height: 12px; border-radius: 50%; }
+        
+        .note-line { display: flex; align-items: flex-start; gap: 0.75rem; color: var(--text-secondary); line-height: 1.4; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+        .note-line:last-child { border-bottom: none; padding-bottom: 0; }
+        .note-line i { margin-top: 0.2rem; color: #64748b; font-size: 0.9rem; width: 16px; text-align: center; }
+
+        .load-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.75rem; }
+        .load-table th { color: var(--text-secondary); font-weight: 600; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color); }
+        .load-table td { padding: 0.4rem 0; font-weight: 600; }
+        .load-table .subj-name { text-align: left; display: flex; align-items: center; gap: 0.5rem; }
+        .load-square { width: 10px; height: 10px; border-radius: 2px; }
+        .total-row { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 0.5rem; border-top: 2px solid var(--border-color); font-weight: 800; font-size: 0.85rem;}
+        .total-badge { background: #0f172a; color: white; padding: 0.4rem 1rem; border-radius: 4px; font-size: 1rem; }
+
+        .insight-line { display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.75rem; }
+        .insight-line i { font-size: 1rem; margin-top: 0.1rem; width: 18px; text-align: center; }
+        .i-green { color: #10b981; } .i-leaf { color: #84cc16; } .i-blue { color: #3b82f6; } .i-red { color: #ef4444; }
+        .insight-content strong { display: block; color: var(--text-primary); font-size: 0.8rem; }
+        .insight-content span { color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 0.1rem; }
+
+        .productivity-banner {
+            background: #fef08a; color: #854d0e; text-align: center; padding: 0.75rem; border-radius: 6px; font-weight: 600; font-size: 0.85rem; margin-top: 0.5rem; border: 1px solid #fde047; display: flex; justify-content: center; align-items: center; gap: 0.5rem;
+        }
+
+        [data-theme="dark"] .productivity-banner { background: rgba(234, 179, 8, 0.1); color: #fde047; border-color: rgba(234, 179, 8, 0.2); }
+
+        /* --- Native Print CSS (Ctrl + P support) --- */
+        @media print {
+            body { padding: 0 !important; background-color: var(--bg-color) !important; }
+            .controls, .productivity-banner { display: none !important; }
+            .timetable-container { overflow: visible !important; border: none; box-shadow: none; }
+            .container { gap: 1rem; max-width: 100%; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container" id="exportContent">
+        <!-- Header -->
+        <header class="header">
+            <div class="univ-title">
+                <h1>Delhi Technological University</h1>
+                <h2>Department of Software Engineering</h2>
+            </div>
+            <div class="meta-info">
+                <div class="meta-item"><i class="fas fa-users"></i> SEC-A2</div>
+                <div class="meta-item"><i class="fas fa-door-open"></i> AB-4 (401)</div>
+                <div class="meta-item"><i class="fas fa-clock"></i> w.e.f. 28/07/2026</div>
+            </div>
+            <div class="controls" id="actionControls">
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="Search...">
+                </div>
+                <!-- Export Buttons Added Here -->
+                <button id="saveImgBtn" class="btn-export" title="Save as Image"><i class="fas fa-image"></i> PNG</button>
+                <button id="savePdfBtn" class="btn-export" title="Save as PDF"><i class="fas fa-file-pdf"></i> PDF</button>
+                <button id="themeToggle" title="Toggle Theme"><i class="fas fa-moon"></i></button>
+            </div>
+        </header>
+
+        <!-- Timetable Grid -->
+        <div class="timetable-container" id="timetableContainer">
+            <div class="timetable" id="timetableGrid">
+                <!-- Generated by JS -->
+            </div>
+        </div>
+
+        <!-- 4 Panel Dashboard -->
+        <div class="dashboard-panels">
+            <div class="panel">
+                <div class="panel-header">Subjects (As per Time Table)</div>
+                <div class="panel-body">
+                    <div class="subject-line"><div class="dot" style="background: var(--color-dsd-dot)"></div> SE201 - DIGITAL SYSTEMS AND DESIGN (DSD)</div>
+                    <div class="subject-line"><div class="dot" style="background: var(--color-ds-dot)"></div> SE203 - DATA STRUCTURES (DS)</div>
+                    <div class="subject-line"><div class="dot" style="background: var(--color-oop-dot)"></div> SE205 - OBJECT ORIENTED PROGRAMMING (OOP)</div>
+                    <div class="subject-line"><div class="dot" style="background: var(--color-os-dot)"></div> SE207 - OPERATING SYSTEM (OS)</div>
+                    <div class="subject-line"><div class="dot" style="background: var(--color-sem-dot)"></div> SE209 - SOFTWARE ENGG METHODOLOGIES (SEM)</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">Legend & Notes</div>
+                <div class="panel-body">
+                    <div class="note-line">
+                        <i class="fas fa-users"></i>
+                        <div><strong>A2</strong> = Section | <strong>G1, G2, G3</strong> = Groups</div>
+                    </div>
+                    <div class="note-line">
+                        <i class="fas fa-flask"></i>
+                        <div>Labs are of 2 hours duration.</div>
+                    </div>
+                    <div class="note-line">
+                        <i class="fas fa-layer-group"></i>
+                        <div>Some lab slots are group-wise. Some are single group.</div>
+                    </div>
+                    <div class="note-line">
+                        <i class="fas fa-info-circle"></i>
+                        <div>Faculty/Lab not decided shown as <strong>[ ]</strong>.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">Weekly Subject Load (Per Student)</div>
+                <div class="panel-body" style="padding-bottom: 0.5rem;">
+                    <table class="load-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;">Subject</th>
+                                <th>Theory</th>
+                                <th>Lab</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="subj-name"><div class="load-square" style="background: var(--color-dsd-dot)"></div> SE201 - DSD</td>
+                                <td>3</td><td>2</td><td>5</td>
+                            </tr>
+                            <tr>
+                                <td class="subj-name"><div class="load-square" style="background: var(--color-ds-dot)"></div> SE203 - DS</td>
+                                <td>3</td><td>2</td><td>5</td>
+                            </tr>
+                            <tr>
+                                <td class="subj-name"><div class="load-square" style="background: var(--color-oop-dot)"></div> SE205 - OOP</td>
+                                <td>3</td><td>2</td><td>5</td>
+                            </tr>
+                            <tr>
+                                <td class="subj-name"><div class="load-square" style="background: var(--color-os-dot)"></div> SE207 - OS</td>
+                                <td>3</td><td>2</td><td>5</td>
+                            </tr>
+                            <tr>
+                                <td class="subj-name"><div class="load-square" style="background: var(--color-sem-dot)"></div> SE209 - SEM</td>
+                                <td>3</td><td>2</td><td>5</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="total-row">
+                        <span>TOTAL HOURS PER WEEK</span>
+                        <div class="total-badge">25</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">Quick Insights</div>
+                <div class="panel-body">
+                    <div class="insight-line">
+                        <i class="fas fa-calendar-check i-green"></i>
+                        <div class="insight-content">
+                            <strong>Busiest Days</strong>
+                            <span>Monday & Wednesday (6 hours total)</span>
+                        </div>
+                    </div>
+                    <div class="insight-line">
+                        <i class="fas fa-leaf i-leaf"></i>
+                        <div class="insight-content">
+                            <strong>Lightest Day</strong>
+                            <span>Thursday (Only 3 theory classes, 0 labs)</span>
+                        </div>
+                    </div>
+                    <div class="insight-line">
+                        <i class="far fa-clock i-blue"></i>
+                        <div class="insight-content">
+                            <strong>Heavy Lab Days</strong>
+                            <span>Mon & Wed feature back-to-back 2hr labs</span>
+                        </div>
+                    </div>
+                    <div class="insight-line">
+                        <i class="fas fa-bullseye i-red"></i>
+                        <div class="insight-content">
+                            <strong>Workload Distribution</strong>
+                            <span>Perfectly balanced (5 hours per subject)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="productivity-banner">
+            <i class="far fa-lightbulb"></i> Plan your study time around theory + lab commitments for better productivity!
+        </div>
+    </div>
+
+    <script>
+        const timetableData = {
+            "days": ["MON", "TUE", "WED", "THUR", "FRI"],
+            "slots": ["8--9", "9--10", "10--11", "11--12", "12--1", "1--2", "2--3", "3--4", "4--5", "5--6"],
+            "schedule": {
+                "MON": {
+                    "9--10": { type: "theory", subject: "SEM SE 209", faculty: "[GUEST 1]" },
+                    "10--12": {
+                        type: "lab",
+                        G1: { subject: "OS LAB A2G1 SE205", faculty: "[Dr.Geetanjali Garg]", room: "(ASE LAB)" },
+                        G2: { subject: "SEM LAB A2G2", faculty: "[Dr.Shweta Meena]", room: "(AI&ML LAB)" },
+                        G3: { subject: "DSD LAB SE 201 G3", faculty: "[]", room: "" }
+                    },
+                    "1--2": { type: "theory", subject: "DS SE 203", faculty: "( Ms. Shweta Gupta)" },
+                    "2--4": {
+                        type: "lab",
+                        G1: { subject: "SEM LAB A2G1 SE207", faculty: "[Mr. Vibhor Singh]", room: "(CS LAB)" },
+                        G2: { subject: "OS LAB A2G2", faculty: "[Ms. Tina]", room: "(ASE LAB)" },
+                        G3: { subject: "DS LAB A2G3", faculty: "[Mr. Rahul]", room: "(DBMS LAB)" }
+                    }
+                },
+                "TUE": {
+                    "10--11": { type: "theory", subject: "DSD SE 201", faculty: "[]" },
+                    "11--12": { type: "theory", subject: "SEM SE 209", faculty: "[GUEST 1]" },
+                    "12--2": {
+                        type: "lab",
+                        G1: { status: "FREE" },
+                        G2: { subject: "DSD LAB SE 201 A2G2", faculty: "[]", room: "" },
+                        G3: { status: "FREE" }
+                    },
+                    "2--3": { type: "theory", subject: "OS SE207", faculty: "[ Guest 18]" },
+                    "3--4": { type: "theory", "subject": "OOP SE 205", faculty: "[ GUEST 10 ]" }
+                },
+                "WED": {
+                    "10--12": {
+                        type: "lab",
+                        G1: { status: "FREE" },
+                        G2: { subject: "DS LAB A2G2 SE201", faculty: "[Mr. Ayush]", room: "[ASE LAB]" },
+                        G3: { subject: "OS LAB A2G3", faculty: "[Dr. Divyashikha Sethia]", room: "(DBMS LAB)" }
+                    },
+                    "12--2": {
+                        type: "lab",
+                        G1: { subject: "DS LAB A2G1 SE201", faculty: "[Mr. Manoj Patidar]", room: "(ASE Lab )" },
+                        G2: { subject: "OOP LAB A2G2", faculty: "[Dr. Sonika Dahiya]", room: "(CS LAB)" },
+                        G3: { subject: "SEM LAB A2G3", faculty: "[Ms. Sowmya]", room: "(AI & ML LAB)" }
+                    },
+                    "2--4": {
+                        type: "lab",
+                        G1: { subject: "OOP LAB A2G1 SE203", faculty: "[Mr. Shubhadip Da]", room: "[ ASE LAB]" },
+                        G2: { status: "FREE" },
+                        G3: { subject: "OOP LAB A2G3", faculty: "[Dr. Saanjay Patidar]", room: "(ASE LAB)" }
+                    },
+                    "4--5": { type: "theory", subject: "DS SE 203", faculty: "( Ms. Shweta Gupta)" },
+                    "5--6": { type: "theory", subject: "OOP SE 205", faculty: "[ GUEST 10 ]" }
+                },
+                "THUR": {
+                    "12--1": { type: "theory", subject: "DSD SE 201", faculty: "[]" },
+                    "2--3": { type: "theory", subject: "DS SE 203", faculty: "( Ms. Shweta Gupta)" },
+                    "3--4": { type: "theory", "subject": "OS SE207", faculty: "[ Guest 18]" }
+                },
+                "FRI": {
+                    "9--10": { type: "theory", subject: "OS SE207", faculty: "[ Guest 18]" },
+                    "10--11": { type: "theory", subject: "DSD SE 201", faculty: "[]" },
+                    "11--12": { type: "theory", subject: "OOP SE 205", faculty: "[ GUEST 10 ]" },
+                    "12--1": { type: "theory", subject: "SEM SE 209", faculty: "[GUEST 1]" },
+                    "2--4": {
+                        type: "lab",
+                        G1: { subject: "DSD LAB SE 201 A2G1", faculty: "[]", room: "" },
+                        G2: { status: "FREE" },
+                        G3: { status: "FREE" }
+                    }
+                }
+            }
+        };
+
+        const getColorClass = (subjectText) => {
+            if (!subjectText || subjectText === "FREE") return "bg-free";
+            const text = subjectText.toUpperCase();
+            if (text.includes("OS")) return "bg-os";
+            if (text.includes("SEM")) return "bg-sem";
+            if (text.includes("DSD")) return "bg-dsd";
+            if (text.includes("DS") && !text.includes("DSD")) return "bg-ds";
+            if (text.includes("OOP")) return "bg-oop";
+            return "bg-free";
+        };
+
+        const grid = document.getElementById("timetableGrid");
+        
+        grid.innerHTML += `<div class="cell cell-header"></div>`;
+        timetableData.slots.forEach(slot => {
+            grid.innerHTML += `<div class="cell cell-header">${slot.replace('--', '-')}</div>`;
+        });
+
+        const currentDayIndex = new Date().getDay();
+        const currentDayStr = ["SUN", "MON", "TUE", "WED", "THUR", "FRI", "SAT"][currentDayIndex];
+
+        timetableData.days.forEach(day => {
+            const isToday = day === currentDayStr;
+            grid.innerHTML += `<div class="cell cell-header day-header ${isToday ? 'current-day' : ''}">${day}</div>`;
+            
+            let skipNext = false;
+
+            for (let i = 0; i < timetableData.slots.length; i++) {
+                if (skipNext) { skipNext = false; continue; }
+
+                const slot = timetableData.slots[i];
+                const nextSlot = timetableData.slots[i + 1];
+                const dualSlotStr = `${slot.split('--')[0]}--${nextSlot ? nextSlot.split('--')[1] : ''}`;
+                
+                const daySchedule = timetableData.schedule[day];
+                let contentHTML = ``, extraClasses = ``;
+
+                if (daySchedule[dualSlotStr] && daySchedule[dualSlotStr].type === "lab") {
+                    const labData = daySchedule[dualSlotStr];
+                    extraClasses = `slot-2-hours search-target`;
+                    skipNext = true;
+                    
+                    let groupsHTML = '';
+                    ['G1', 'G2', 'G3'].forEach(group => {
+                        const gData = labData[group];
+                        if (gData.status === "FREE" || !gData.subject) {
+                            groupsHTML += `<div class="lab-group bg-free"><div class="group-label">A2${group}</div><div class="status-free">FREE</div></div>`;
+                        } else {
+                            const colorCls = getColorClass(gData.subject);
+                            groupsHTML += `<div class="lab-group ${colorCls}"><div class="group-label">A2${group}</div><div><div class="subject">${gData.subject}</div><div class="faculty">${gData.faculty || ''} ${gData.room || ''}</div></div></div>`;
+                        }
+                    });
+                    contentHTML = `<div class="lab-container">${groupsHTML}</div>`;
+                } else if (daySchedule[slot]) {
+                    const classData = daySchedule[slot];
+                    extraClasses = `search-target`;
+                    const colorCls = getColorClass(classData.subject);
+                    contentHTML = `<div class="class-card ${colorCls}"><div class="subject">${classData.subject}</div><div class="faculty">${classData.faculty || ''}</div></div>`;
+                }
+                grid.innerHTML += `<div class="cell ${extraClasses}">${contentHTML}</div>`;
+            }
+        });
+
+        // Theme Toggle
+        const themeBtn = document.getElementById("themeToggle");
+        const icon = themeBtn.querySelector("i");
+        
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.body.setAttribute('data-theme', 'dark'); icon.className = "fas fa-sun";
+        }
+        themeBtn.addEventListener("click", () => {
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            document.body.setAttribute('data-theme', isDark ? '' : 'dark');
+            icon.className = isDark ? "fas fa-moon" : "fas fa-sun";
+        });
+
+        // Search
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('.search-target').forEach(cell => {
+                cell.style.opacity = (term === '' || cell.innerText.toLowerCase().includes(term)) ? '1' : '0.2';
+            });
+        });
+
+        // --- NEW: EXPORT & SAVE LOGIC ---
+        
+        async function prepareCanvas() {
+            const exportElement = document.getElementById("exportContent");
+            const controls = document.getElementById("actionControls");
+            const tableContainer = document.getElementById("timetableContainer");
+            
+            // Step 1: Temporarily hide buttons/search to keep export clean
+            const originalControlsDisplay = controls.style.display;
+            controls.style.display = "none";
+            
+            // Step 2: Fix overflow issues so full table is captured, even on small screens
+            const originalOverflow = tableContainer.style.overflowX;
+            tableContainer.style.overflowX = "visible";
+
+            // Determine background color based on active theme
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            const bgColor = isDark ? '#0f172a' : '#f3f4f6';
+
+            // Step 3: Render via html2canvas
+            const canvas = await html2canvas(exportElement, {
+                scale: 2, // High resolution
+                backgroundColor: bgColor,
+                useCORS: true
+            });
+
+            // Step 4: Restore original styling
+            controls.style.display = originalControlsDisplay;
+            tableContainer.style.overflowX = originalOverflow;
+
+            return canvas;
+        }
+
+        // Save as Image (PNG)
+        document.getElementById("saveImgBtn").addEventListener("click", async () => {
+            const canvas = await prepareCanvas();
+            const link = document.createElement("a");
+            link.download = "DTU_Timetable.png";
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+        });
+
+        // Save as PDF
+        document.getElementById("savePdfBtn").addEventListener("click", async () => {
+            const canvas = await prepareCanvas();
+            const imgData = canvas.toDataURL("image/png");
+            
+            // Using Landscape A3 size for best fit of wide timetables
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('landscape', 'mm', 'a3'); 
+            
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            // Calculate height proportionately
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width; 
+            
+            // Add margin for visual appeal
+            const margin = 10;
+            pdf.addImage(imgData, 'PNG', margin, margin, pdfWidth - (margin*2), pdfHeight - (margin*2));
+            pdf.save("DTU_Timetable.pdf");
+        });
+    </script>
+</body>
+</html>
